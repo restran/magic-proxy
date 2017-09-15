@@ -5,6 +5,7 @@ from __future__ import unicode_literals, absolute_import
 import re
 import socket
 from optparse import OptionParser
+import platform
 
 import tornado.httpclient
 import tornado.httpserver
@@ -13,6 +14,7 @@ import tornado.iostream
 import tornado.web
 from mountains import logging
 from mountains.logging import StreamHandler
+from mountains.encoding import utf8
 from tornado import gen
 from tornado import httpserver, ioloop
 from tornado.httpclient import AsyncHTTPClient, HTTPRequest, HTTPError
@@ -40,15 +42,15 @@ ASYNC_HTTP_REQUEST_TIMEOUT = 120
 
 ASYNC_HTTP_CLIENT_MAX_CLIENTS = 100
 
-try:
-    # curl_httpclient is faster than simple_httpclient
-    AsyncHTTPClient.configure(
-        'tornado.curl_httpclient.CurlAsyncHTTPClient',
-        max_clients=ASYNC_HTTP_CLIENT_MAX_CLIENTS)
-except ImportError:
-    AsyncHTTPClient.configure(
-        'tornado.simple_httpclient.AsyncHTTPClient',
-        max_clients=ASYNC_HTTP_CLIENT_MAX_CLIENTS)
+if platform.system() != 'windows':
+    try:
+        # curl_httpclient is faster than simple_httpclient
+        AsyncHTTPClient.configure(
+            'tornado.curl_httpclient.CurlAsyncHTTPClient',
+            max_clients=ASYNC_HTTP_CLIENT_MAX_CLIENTS)
+    except ImportError:
+        AsyncHTTPClient.configure(
+            'tornado.simple_httpclient.AsyncHTTPClient')
 
 
 class ProxyHandler(RequestHandler):
@@ -236,6 +238,7 @@ def extract_flag(response):
 
 
 def do_extract_flag(data):
+    data = utf8(data)
     data = data.replace(b'\n', b'')
     data = data.replace(b'\r', b'')
     data = data.replace(b'\t', b'')
@@ -248,7 +251,7 @@ def do_extract_flag(data):
         # (r'(?:key|flag|ctf)\{[^\{\}]{3,35}\}', re.I),
         # (r'(?:key|KEY|flag|FLAG|ctf|CTF)+[\x20-\x7E]{3,50}', re.I),
         (r'(?:key|flag|ctf)[\x20-\x7E]{5,35}', re.I),
-        (r'(?:key|flag|ctf)[\x20-\x7E]{0,3}(?::|=|\{|is)[\x20-\x7E]{,35}', re.I)
+        (r'(?:key|flag|ctf)[\x20-\x7E]{0,3}(?:\:|=|\{|is)[\x20-\x7E]{,35}', re.I)
     ]
 
     for r, option in re_list:
